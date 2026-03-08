@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokéSize — Compare Pokémon Sizes</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <!-- CSS -->
+    <link rel="stylesheet" href="./styles/base.css">
+    <!-- JavaScript -->
+    <script defer src="./scripts/compare.js"></script>
+</head>
+<body>
+    <div class="container">
+  <header>
+    <h1>PokéSize</h1>
+    <p>How do you stack up against your party?</p>
+  </header>
+
+  <div class="setup-panel">
+    <h2>⚙ Your Setup</h2>
+
+    <!-- Height input -->
+    <div class="height-row">
+      <div class="unit-toggle">
+        <button id="btn-imperial" class="active" onclick="switchUnit('imperial')">FT/IN</button>
+        <button id="btn-metric" onclick="switchUnit('metric')">CM</button>
+      </div>
+      <div class="height-inputs" id="height-inputs">
+        <!-- injected by JS -->
+      </div>
+    </div>
+
+    <!-- Pokémon slots -->
+    <div class="pokemon-grid" id="pokemon-grid"></div>
+
+    <div class="loading" id="loading">Loading Pokémon</div>
+
+    <button class="btn-compare" id="btn-compare" onclick="runComparison()">⚔ COMPARE SIZES</button>
+  </div>
+
+  <!-- Comparison output -->
+  <div id="comparison-section">
+    <p class="scene-header">📏 Size Lineup</p>
+    <div class="scene-wrap">
+      <div class="figures-row" id="figures-row"></div>
+      <div class="ground"></div>
+    </div>
+    <div class="drag-hint"><span>↔</span> Drag <strong style="color:var(--yellow)">You</strong> to reposition next to any Pokémon</div>
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+</div>
+</body>
+</html>
