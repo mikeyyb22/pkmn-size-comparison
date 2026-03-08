@@ -321,26 +321,9 @@ function onDrop(e) {
 
 function buildHumanSVG(heightPx) {
   // Proportional human silhouette as SVG
-  const w = heightPx * 0.45;
+  const w = heightPx;
   const h = heightPx;
-  return `<svg class="human-figure" width="${w}" height="${h}" viewBox="0 0 45 100" xmlns="http://www.w3.org/2000/svg">
-    <!-- head -->
-    <ellipse cx="22.5" cy="10" rx="8" ry="9" fill="#FFD700" opacity="0.9"/>
-    <!-- body -->
-    <rect x="13" y="20" width="19" height="28" rx="5" fill="#FFD700" opacity="0.85"/>
-    <!-- left arm -->
-    <rect x="4" y="21" width="8" height="22" rx="4" fill="#FFD700" opacity="0.8"/>
-    <!-- right arm -->
-    <rect x="33" y="21" width="8" height="22" rx="4" fill="#FFD700" opacity="0.8"/>
-    <!-- left leg -->
-    <rect x="13" y="46" width="8" height="30" rx="4" fill="#FFD700" opacity="0.8"/>
-    <!-- right leg -->
-    <rect x="24" y="46" width="8" height="30" rx="4" fill="#FFD700" opacity="0.8"/>
-    <!-- left foot -->
-    <ellipse cx="17" cy="76" rx="7" ry="4" fill="#E3350D" opacity="0.9"/>
-    <!-- right foot -->
-    <ellipse cx="28" cy="76" rx="7" ry="4" fill="#E3350D" opacity="0.9"/>
-  </svg>`;
+  return `<img class="human-figure" width="${w}" height="${h}" viewBox="0 0 45 100" src="https://play.pokemonshowdown.com/sprites/trainers/brendan.png" alt="pokemon trainer">`
 }
 
 function buildStats(userCm, filled) {
