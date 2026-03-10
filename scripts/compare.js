@@ -89,7 +89,12 @@ function renderSlots() {
         ${slot.data
           ? `✓ ${capitalize(slot.data.name)} (${formatHeight(slot.data.height * 10)})`
           : slot.error ? '✗ Not found' : ''}
-      </div>`;
+      </div>
+      ${slot.data ? `
+      <label class="shiny-label" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:4px;">
+        <input type="checkbox" ${slot.shiny ? 'checked' : ''} onchange="toggleShiny(${i}, this.checked)">
+        Shiny
+      </label>` : ''}`;
     grid.appendChild(div);
   });
 }
@@ -134,7 +139,12 @@ function rerenderSlot(i) {
       ${slot.data
         ? `✓ ${capitalize(slot.data.name)} (${formatHeight(slot.data.height * 10)})`
         : slot.error ? '✗ Not found' : ''}
-    </div>`;
+    </div>
+    ${slot.data ? `
+    <label class="shiny-label" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:4px;">
+      <input type="checkbox" ${slot.shiny ? 'checked' : ''} onchange="toggleShiny(${i}, this.checked)">
+      Shiny
+    </label>` : ''}`;
 }
 
 // Partial update — never touches the input element, preserving focus
@@ -175,6 +185,19 @@ function updateSlotUI(i) {
   } else if (!slot.data && existingClear) {
     existingClear.remove();
   }
+
+  // Update shiny checkbox
+  const existingShiny = el.querySelector('.shiny-label');
+  if (slot.data && !existingShiny) {
+    const label = document.createElement('label');
+    label.className = 'shiny-label';
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:4px;';
+    label.innerHTML = `<input type="checkbox" ${slot.shiny ? 'checked' : ''}> Shiny`;
+    label.querySelector('input').onchange = (e) => toggleShiny(i, e.target.checked);
+    el.appendChild(label);
+  } else if (!slot.data && existingShiny) {
+    existingShiny.remove();
+  }
 }
 
 async function fetchPokemon(i) {
@@ -191,6 +214,24 @@ async function fetchPokemon(i) {
     slots[i].error = true;
   }
   updateSlotUI(i);
+}
+
+function toggleShiny(i, val) {
+  slots[i].shiny = val;
+  // Update the slot preview to reflect shiny/default
+  const preview = document.getElementById(`slot-preview-${i}`);
+  if (preview && slots[i].data) {
+    const sprite = val && slots[i].data.sprites.front_shiny
+      ? slots[i].data.sprites.front_shiny
+      : slots[i].data.sprites.front_default;
+    preview.innerHTML = `<img src="${sprite}" alt="${slots[i].data.name}">`;
+  }
+  // Refresh the scene if it's already visible
+  if (document.getElementById('comparison-section').classList.contains('visible')) {
+    const userCm = getUserHeightCm();
+    const filled = slots.filter(s => s.data);
+    buildScene(userCm, filled);
+  }
 }
 
 // ─── Comparison ───────────────────────────────────────────────────────
@@ -223,7 +264,7 @@ function buildScene(userCm, filled) {
     ...filled.map(s => ({
       name: capitalize(s.data.name),
       heightCm: s.data.height * 10,
-      sprite: s.data.sprites.front_default,
+      sprite: s.shiny && s.data.sprites.front_shiny ? s.data.sprites.front_shiny : s.data.sprites.front_default,
       data: s.data,
       isUser: false
     }))
@@ -236,45 +277,48 @@ function renderScene() {
   row.innerHTML = '';
 
   const maxCm = Math.max(...sceneEntities.map(e => e.heightCm));
-  const sceneHeightPx = 240;
+  const minCm = Math.min(...sceneEntities.map(e => e.heightCm));
+  const minRenderedPx = 150;
+  const maxSceneHeightPx = 500; // prevents giant Pokémon making the scene too tall
+  const pxPerCm = Math.min(maxSceneHeightPx / maxCm, Math.max(240 / maxCm, minRenderedPx / minCm));
+  const sceneHeightPx = maxCm * pxPerCm;
 
-  sceneEntities.forEach((entity, idx) => {
-    const scaledPx = Math.max(30, (entity.heightCm / maxCm) * sceneHeightPx);
-    const col = document.createElement('div');
-    col.className = 'figure-col';
-    col.style.animationDelay = `${idx * 0.08}s`;
-    col.dataset.idx = idx;
+  (async () => {
+    for (const [idx, entity] of sceneEntities.entries()) {
+      const scaledPx = Math.round(entity.heightCm * pxPerCm);
+      const col = document.createElement('div');
+      col.className = 'figure-col';
+      col.style.animationDelay = `${idx * 0.08}s`;
+      col.dataset.idx = idx;
 
-    let figureHTML = '';
-    if (entity.isUser) {
-      figureHTML = buildHumanSVG(scaledPx);
-      // Only the human is draggable
-      col.draggable = true;
-      col.title = 'Drag to reposition';
-    } else {
-      figureHTML = `<img src="${entity.sprite}" alt="${entity.name}"
-        style="height:${scaledPx}px; width:auto;"
-        title="${entity.name}: ${formatHeight(entity.heightCm)}">`;
+      let figureHTML = '';
+      if (entity.isUser) {
+        figureHTML = buildHumanSVG(scaledPx);
+        col.draggable = true;
+        col.title = 'Drag to reposition';
+      } else {
+        const croppedSrc = await cropTransparentPadding(entity.sprite);
+        figureHTML = `<img src="${croppedSrc}" alt="${entity.name}"
+          style="height:${scaledPx}px; width:auto;"
+          title="${entity.name}: ${formatHeight(entity.heightCm)}">`;
+      }
+
+      col.innerHTML = `
+        <div class="figure-img-wrap" style="height:${sceneHeightPx}px; align-items:flex-end; display:flex; justify-content:center;">
+          ${figureHTML}
+        </div>
+        <div class="figure-label">${entity.name}</div>
+        <div class="figure-height-tag ${entity.isUser ? 'you' : ''}">${formatHeight(entity.heightCm)}</div>`;
+
+      col.addEventListener('dragstart', onDragStart);
+      col.addEventListener('dragend', onDragEnd);
+      col.addEventListener('dragover', onDragOver);
+      col.addEventListener('dragleave', onDragLeave);
+      col.addEventListener('drop', onDrop);
+
+      row.appendChild(col);
     }
-
-    col.innerHTML = `
-      <div class="figure-img-wrap" style="height:${sceneHeightPx}px; align-items:flex-end; display:flex; justify-content:center;">
-        ${figureHTML}
-      </div>
-      <div class="figure-label">${entity.name}</div>
-      <div class="figure-height-tag ${entity.isUser ? 'you' : ''}">${formatHeight(entity.heightCm)}</div>`;
-
-    // Drag events (only human col fires dragstart)
-    col.addEventListener('dragstart', onDragStart);
-    col.addEventListener('dragend', onDragEnd);
-
-    // All cols are drop targets
-    col.addEventListener('dragover', onDragOver);
-    col.addEventListener('dragleave', onDragLeave);
-    col.addEventListener('drop', onDrop);
-
-    row.appendChild(col);
-  });
+  }) ();
 }
 
 let dragSrcIdx = null;
@@ -320,10 +364,10 @@ function onDrop(e) {
 }
 
 function buildHumanSVG(heightPx) {
-  // Proportional human silhouette as SVG
+ 
   const w = heightPx;
   const h = heightPx;
-  return `<img class="human-figure" width="${w}" height="${h}" viewBox="0 0 45 100" src="https://play.pokemonshowdown.com/sprites/trainers/brendan.png" alt="pokemon trainer">`
+  return `<img class="human-figure" src="https://play.pokemonshowdown.com/sprites/trainers/brendan.png" alt="pokemon trainer" style="height:${h}px; width:${w}px; object-fit:contain;">`;
 }
 
 function buildStats(userCm, filled) {
@@ -346,6 +390,45 @@ function buildStats(userCm, filled) {
       </div>
       ${taller ? `<div class="taller-badge">TALLER THAN YOU</div>` : ''}`;
     grid.appendChild(card);
+  });
+}
+
+// Get rid of transparent padding from Pokemon images
+function cropTransparentPadding(imgSrc) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
+
+      let top = height, bottom = 0, left = width, right = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const alpha = data[(y * width + x) * 4 + 3];
+          if (alpha > 10) {
+            if (y < top) top = y;
+            if (y > bottom) bottom = y;
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
+      }
+
+      const croppedWidth = right - left + 1;
+      const croppedHeight = bottom - top + 1;
+      const cropped = document.createElement('canvas');
+      cropped.width = croppedWidth;
+      cropped.height = croppedHeight;
+      cropped.getContext('2d').drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
+      resolve(cropped.toDataURL());
+    };
+    img.src = imgSrc;
   });
 }
 
