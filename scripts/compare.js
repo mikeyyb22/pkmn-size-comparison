@@ -1,6 +1,8 @@
 let unit = 'imperial';
 let slots = Array(6).fill(null).map(() => ({ input: '', data: null, error: false }));
 let debounceTimers = [];
+let useAnimated = false;
+const spriteCache = {}; // key: url → cropped data URL
 
 // ─── Init ─────────────────────────────────────────────────────────────
 function init() {
@@ -261,13 +263,17 @@ let sceneEntities = [];
 function buildScene(userCm, filled) {
   sceneEntities = [
     { name: 'You', heightCm: userCm, isUser: true },
-    ...filled.map(s => ({
-      name: capitalize(s.data.name),
-      heightCm: s.data.height * 10,
-      sprite: s.shiny && s.data.sprites.front_shiny ? s.data.sprites.front_shiny : s.data.sprites.front_default,
-      data: s.data,
-      isUser: false
-    }))
+    ...filled.map(s => {
+      const { url, isAnimated } = getSpriteUrl(s);
+      return {
+        name: capitalize(s.data.name),
+        heightCm: s.data.height * 10,
+        sprite: url,
+        isAnimated: isAnimated,
+        data: s.data,
+        isUser: false
+      };
+    })
   ];
   renderScene();
 }
@@ -285,6 +291,7 @@ function renderScene() {
 
   (async () => {
     for (const [idx, entity] of sceneEntities.entries()) {
+      console.log(entity.name, 'isAnimated:', entity.isAnimated, 'sprite:', entity.sprite);
       const scaledPx = Math.round(entity.heightCm * pxPerCm);
       const col = document.createElement('div');
       col.className = 'figure-col';
@@ -296,6 +303,10 @@ function renderScene() {
         figureHTML = buildHumanSVG(scaledPx);
         col.draggable = true;
         col.title = 'Drag to reposition';
+      } else if (entity.isAnimated) {
+        figureHTML = `<img src="${entity.sprite}" alt="${entity.name}"
+          style="height:${scaledPx * 1.1}px; width:auto; image-rendering:pixelated;
+          title=${entity.name}: ${formatHeight(entity.heightCm)}">`;
       } else {
         const croppedSrc = await cropTransparentPadding(entity.sprite);
         figureHTML = `<img src="${croppedSrc}" alt="${entity.name}"
@@ -394,7 +405,8 @@ function buildStats(userCm, filled) {
 }
 
 // Get rid of transparent padding from Pokemon images
-function cropTransparentPadding(imgSrc) {
+async function cropTransparentPadding(imgSrc) {
+  if (spriteCache[imgSrc]) return spriteCache[imgSrc];
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
@@ -404,9 +416,7 @@ function cropTransparentPadding(imgSrc) {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-
       const { data, width, height } = ctx.getImageData(0, 0, img.width, img.height);
-
       let top = height, bottom = 0, left = width, right = 0;
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -419,17 +429,42 @@ function cropTransparentPadding(imgSrc) {
           }
         }
       }
-
       const croppedWidth = right - left + 1;
       const croppedHeight = bottom - top + 1;
       const cropped = document.createElement('canvas');
       cropped.width = croppedWidth;
       cropped.height = croppedHeight;
       cropped.getContext('2d').drawImage(canvas, left, top, croppedWidth, croppedHeight, 0, 0, croppedWidth, croppedHeight);
-      resolve(cropped.toDataURL());
+      const result = cropped.toDataURL();
+      spriteCache[imgSrc] = result;
+      resolve(result);
     };
     img.src = imgSrc;
   });
+}
+
+function getSpriteUrl(s) {
+  if (useAnimated) {
+    const animated = s.data.sprites?.versions?.['generation-v']?.['black-white']?.animated;
+    const url = s.shiny ? animated?.front_shiny : animated?.front_default;
+    if (url) return { url, isAnimated: true };
+  }
+  const url = s.shiny && s.data.sprites.front_shiny
+    ? s.data.sprites.front_shiny
+    : s.data.sprites.front_default;
+  return { url, isAnimated: false };
+}
+
+function toggleAnimated() {
+  useAnimated = !useAnimated;
+  const btn = document.getElementById('btn-animated');
+  btn.textContent = useAnimated ? 'Show Static Sprites' : 'Show Animated Sprites';
+  btn.title = useAnimated ? 'Switch to static sprites' : 'Switch to animated sprites';
+  if (document.getElementById('comparison-section').classList.contains('visible')) {
+    const userCm = getUserHeightCm();
+    const filled = slots.filter(s => s.data);
+    buildScene(userCm, filled);
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────

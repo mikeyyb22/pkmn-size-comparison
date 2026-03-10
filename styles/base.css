@@ -348,19 +348,6 @@
     box-shadow: 0 12px 40px rgba(0,0,0,0.6);
   }
 
-  /* Moon */
-  .scene-wrap::before {
-    content: '';
-    position: absolute;
-    top: 20px;
-    right: 40px;
-    width: 48px;
-    height: 48px;
-    background: radial-gradient(circle at 35% 35%, #ffffee, #d4d4aa);
-    border-radius: 50%;
-    box-shadow: 0 0 20px rgba(255,255,220,0.3);
-  }
-
   .scene-wrap::-webkit-scrollbar {
     height: 6px;
   }
